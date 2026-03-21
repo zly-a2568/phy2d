@@ -1,0 +1,56 @@
+#include "../../include/Object/Box.hpp"
+namespace phy2d{
+Box::Box(float x ,float y, float width, float height, float mass){
+    this->position = vec2(x, y);
+    this->velocity = vec2(0, 0);
+    this->size = vec2(width, height);
+    this->angle=0;
+    this->angle_velocity=0;
+    this->torque=0;
+    this->force=vec2(0, 0);
+    this->mass = mass;
+    this->RotationInertia = (1.0f / 12.0f) * mass * (size.x * size.x + size.y * size.y);
+    this->type = BOX;
+}
+
+void Box::update(float dt){
+    angle_velocity+=torque/RotationInertia;
+    velocity+=force/mass;
+    position+=velocity*dt;
+    angle+=angle_velocity*dt;
+    force = vec2(0,0);
+    torque = 0;
+
+}
+
+vec2 Box::getSize()const{
+    return size;
+}
+
+std::vector<vec2> Box::getVertices(){
+    std::vector<vec2> vertices;
+    vec2 ne = size*0.5f;
+    vec2 nw = vec2(-ne.x, ne.y);
+    vec2 sw = vec2(-ne.x, -ne.y);
+    vec2 se = vec2(ne.x, -ne.y);
+    vec2 new_ne = vec2(ne.x*cos(angle)-ne.y*sin(angle),ne.x*sin(angle)+ne.y*cos(angle));
+    vec2 new_nw = vec2(nw.x*cos(angle)-nw.y*sin(angle),nw.x*sin(angle)+nw.y*cos(angle));
+    vec2 new_sw = vec2(sw.x*cos(angle)-sw.y*sin(angle),sw.x*sin(angle)+sw.y*cos(angle));
+    vec2 new_se = vec2(se.x*cos(angle)-se.y*sin(angle),se.x*sin(angle)+se.y*cos(angle));
+    vertices.push_back(position+new_ne);
+    vertices.push_back(position+new_nw);
+    vertices.push_back(position+new_sw);
+    vertices.push_back(position+new_se);
+    return vertices;
+
+}
+std::vector<vec2> Box::getEdges(){
+    std::vector<vec2> edges;
+    std::vector<vec2> vertices = getVertices();
+    edges.push_back(vertices[0]-vertices[1]);
+    edges.push_back(vertices[1]-vertices[2]);
+    edges.push_back(vertices[2]-vertices[3]);
+    edges.push_back(vertices[3]-vertices[0]);
+    return edges;
+}
+}
