@@ -42,14 +42,17 @@ public:
 
 	virtual void applyTorque(float t);
 	virtual void applyForce(vec2 f);
+	virtual void applyImpulse(vec2 p,vec2 n);
 
-	virtual void addVelocity(float vx, float vy);
-	virtual void addAngleVelocity(float av);
 
 	virtual float getRotationInertia() const;
 
 	// 更新物体状态
 	virtual void update(float dt) = 0;
+	virtual bool isStatic() const;
+	virtual bool isAwake() const;
+	virtual void setAwake(bool a);
+	virtual void updateSleepTime(float dt);
 
 	BodyType getType();
 
@@ -63,8 +66,9 @@ public:
 	float RotationInertia;
 	float angle;
 	Rect bounding_box;
-	vec2 tmp_v;
-	float tmp_av;
+	bool is_static;
+	bool awake=true;
+	float sleep_time;
 };
 
 } // namespace phy2d

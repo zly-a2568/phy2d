@@ -4,9 +4,11 @@
 #include "../Object/Circle.hpp"
 #include "../Object/Line.hpp"
 #include "../Object/Box.hpp"
+#include "CollideInfo.hpp"
 using namespace glm;
 
 #include <iostream>
+#include <algorithm>
 
 namespace phy2d{
     class Collision{
@@ -27,19 +29,16 @@ namespace phy2d{
             return true;
         }
 
-        static std::pair<float,float> getPolygonProjection(std::vector<vec2>& vertices, vec2 p1, vec2 p2){
+        static std::pair<float,float> getPolygonProjection(std::vector<vec2> vertices, vec2 p){
             std::pair<float,float> result;
+            std::vector<float> points;
             for(auto v:vertices){
-                float x=dot(v-p1,p2-p1)/length(p2-p1);
-                if ((!result.first) ||(!result.second)){
-                    result.first=x;
-                    result.second=x;
-                }
-                else{
-                    result.first=glm::min(result.first,x);
-                    result.second=glm::max(result.second,x);
-                }
+                float x=dot(v,p)/length(p);
+                points.push_back(x);
             }
+            std::sort(points.begin(),points.end());
+            result.first=*points.begin();
+            result.second=*points.rbegin();
             return result;
         }
 
@@ -144,18 +143,17 @@ namespace phy2d{
 
             vec3 impulsen= j_n * vec3(normal.x, normal.y, 0.0f);
             vec3 impulset= j * vec3(t.x, t.y, 0.0f);
-            std::cout << impulsen.x << " " << impulsen.y << " " << impulsen.z << std::endl;
-            std::cout << impulset.x << " " << impulset.y << " " << impulset.z << std::endl;
+            vec3 impulse= impulsen + impulset;
 
-            vec3 newaVel =  impulsen / aMass;
-            vec3 newbVel = - impulsen / bMass;
+            vec3 newaVel =  impulse / aMass;
+            vec3 newbVel = - impulse / bMass;
             res.push_back(newaVel.x);
             res.push_back(newaVel.y);
             res.push_back(newbVel.x);
             res.push_back(newbVel.y);
 
-            vec3 newaAngleVel = cross(r1, impulset) / aInertia;
-            vec3 newbAngleVel = cross(r2, -impulset) / bInertia;
+            vec3 newaAngleVel = cross(r1, impulse) / aInertia;
+            vec3 newbAngleVel = cross(r2, -impulse) / bInertia;
 
             res.push_back(newaAngleVel.z);
             res.push_back(newbAngleVel.z);
@@ -194,25 +192,46 @@ namespace phy2d{
             return res;
         }
         
-        static std::vector<float> collideDynamicWithStatic(float depth,vec2 normal,vec2 cpoint,vec2 aPos,vec2 bPos, vec2 aVel,float aMass,float bMass,float aAngleVel,float bAngleVel,float aInertia,float bInertia,float restitution,float friction){
+        static std::vector<float> collideDynamicWithStatic(float depth,vec2 normal,vec2 cpoint,vec2 aPos,vec2 bPos, vec2 aVel,float aMass,float aAngleVel,float aInertia,float restitution,float friction){
             std::vector<float> res;
             vec2 fixed_aPos = aPos + normal * depth;
-            vec2 t = vec2(normal.y, -normal.x);
-            vec2 nv1=-dot(normal, aVel)/length(normal)*restitution*normal;
-            vec2 tv1=dot(t, aVel)/length(t)*t;
-            vec2 newaVel = nv1+tv1;
+
+            vec2 t=vec2(normal.y, -normal.x);
+
+            vec3 r1 = vec3(cpoint.x,cpoint.y,0.0f) - vec3(aPos.x, aPos.y, 0.0f);
+            
+            vec3 vc1= vec3(aVel.x, aVel.y, 0.0f) + cross(vec3(0,0,aAngleVel), r1);
+
+            vec3 vc_rel= vc1;
+
+
+            float vc_rel_n = dot(vc_rel, vec3(normal.x, normal.y, 0.0f));
+            
+            float vc_rel_t = dot(vec2(vc_rel.x, vc_rel.y), t);
+
+            float tdenom = (1/aMass +(length(r1)*length(r1))/aInertia);
+            float ndenom = 1/aMass;
+
+            float j_n = -(1+restitution) * vc_rel_n / ndenom;
+
+            float j = -vc_rel_t / tdenom;
+
+            if(abs(j) >abs(j_n)*friction){
+                j=sign(j)*abs(j_n)*friction;
+            }
+
+            vec3 impulsen= j_n * vec3(normal.x, normal.y, 0.0f);
+            vec3 impulset= j * vec3(t.x, t.y, 0.0f);
+            vec3 newaVel = (impulsen+impulset) / aMass;
             res.push_back(newaVel.x);
             res.push_back(newaVel.y);
 
-            vec2 r1 = cpoint-aPos;
-
-            vec3 rt = cross(vec3(r1.x, r1.y, 0), vec3(0, 0, aAngleVel))*friction;
-            vec3 newaAngleVel = vec3(0,0,aAngleVel)+cross(rt,vec3(r1.x,r1.y, 0))/aInertia;
+            vec3 newaAngleVel = cross(r1, (impulset+impulsen) / aInertia);
 
             res.push_back(newaAngleVel.z);
+
             res.push_back(fixed_aPos.x);
             res.push_back(fixed_aPos.y);
-
 
             return res;
         }
@@ -235,12 +254,12 @@ namespace phy2d{
             return res;
 
         }
-        static void collide(Object*a,Object*b){
+        static CollideInfo collide(Object*a,Object*b){
         
             if (a->type == CIRCLE && b->type == CIRCLE) {
                 Circle* ac = dynamic_cast<Circle*>(a);
                 Circle* bc = dynamic_cast<Circle*>(b);
-                if (!CirclevsCircle(ac->position, ac->radius, bc->position, bc->radius)) return;
+                if (!CirclevsCircle(ac->position, ac->radius, bc->position, bc->radius)) return CollideInfo(nullptr,nullptr,vec2(0,0),0,vec2(0,0));
                 vec2 aPos= ac->getPosition();
                 vec2 aVel= ac->getVelocity();
                 vec2 bPos= bc->getPosition();
@@ -251,26 +270,8 @@ namespace phy2d{
                 float bMass= bc->getMass();
                 float aAngleVel= ac->getAngleVelocity();
                 float bAngleVel= bc->getAngleVelocity();
-                auto newVel = collideDynamicWithDynamic(length(aPos-bPos)-(ac->getRadius()+bc->getRadius()),normalize(bPos-aPos),
-                        aPos + normalize(bPos-aPos) * aRadius,
-                        aPos,
-                        bPos,
-                        aVel,
-                        bVel,
-                        aMass,
-                        bMass,
-                        aAngleVel,
-                        bAngleVel,
-                        ac->getRotationInertia(),
-                        bc->getRotationInertia(),
-                        0.99f,
-                        0.5f);
-                ac->setPosition(newVel[6], newVel[7]);
-                bc->setPosition(newVel[8], newVel[9]);
-                ac->addVelocity(newVel[0], newVel[1]);
-                bc->addVelocity(newVel[2], newVel[3]);
-                ac->addAngleVelocity(newVel[4]);
-                bc->addAngleVelocity(newVel[5]);
+                auto c_info= CollideInfo(ac,bc,normalize(bPos-aPos),length(bPos-aPos)-(aRadius+bRadius),aPos + normalize(bPos-aPos) * aRadius);
+                return c_info;
             }
             if ((a->type == CIRCLE && b->type == LINE)||(a->type == LINE && b->type == CIRCLE)) {
                 Line* l;
@@ -285,7 +286,7 @@ namespace phy2d{
                 }
 
                 int result=CirclevsLine(c->getPosition(), c->getRadius(), l->getPoint1(),l->getPoint2());
-                if(result==-1)return;
+                if(result==-1)return CollideInfo(nullptr,nullptr,vec2(0,0),0,vec2(0,0));
 
 
                 vec2 cpoint = vec3();
@@ -303,33 +304,12 @@ namespace phy2d{
                 vec2 aPos = c->getPosition();
                 vec2 bPos = l->getPosition();
                 float aRadius = c->getRadius();
-                float aMass = c->getMass();
-                float bMass = l->getMass();
-                vec2 aVel = c->getVelocity();
-                float aAngleVel = c->getAngleVelocity();
-                float rb= length(bPos-cpoint);
-
-                //auto newVel = collideCircleWithLine(cpoint,c->getPosition(),c->getRadius(),c->getMass(),c->getVelocity(),c->getAngleVelocity(),l->getPoint1(),l->getPoint2());
-                auto newVel = collideDynamicWithStatic(length(aPos-cpoint)-aRadius,
-                normalize(cpoint-aPos),
-                cpoint,
-                aPos,
-                bPos,
-                aVel,
-                aMass,
-                bMass,
-                aAngleVel,
-                0,
-                c->getRotationInertia(),
-                bMass*rb*rb/2,
-                1.0f,
-                1.0f);
-                c->setPosition(newVel[3],newVel[4]);
-                //c->setAngleVelocity(newVel[2]);
-                c->setVelocity(newVel[0],newVel[1]);
+                auto c_info= CollideInfo(c,l,normalize(cpoint-aPos),length(cpoint-aPos)-aRadius,cpoint);
+                return c_info;
 
             }
             if ((a->getType() == BodyType::CIRCLE && b->getType() == BodyType::BOX)||(b->getType() == BodyType::CIRCLE && a->getType() == BodyType::BOX)) {
+                
                 Box* bx;
                 Circle* c;
                 if (a->type == BodyType::BOX) {
@@ -340,75 +320,18 @@ namespace phy2d{
                     bx = dynamic_cast<Box*>(b);
                     c = dynamic_cast<Circle*>(a);
                 }
-                vec2 cpos= c->getPosition();
-                float cRadius = c->getRadius();
-                vec2 cpoint;
-                vec2 normal;
-                auto b_vertices = bx->getVertices();
-                vec2 cp1=ClosestPointOnLineSegment(cpos,b_vertices[0],b_vertices[1]);
-                vec2 cp2=ClosestPointOnLineSegment(cpos,b_vertices[1],b_vertices[2]);
-                vec2 cp3=ClosestPointOnLineSegment(cpos,b_vertices[2],b_vertices[3]);
-                vec2 cp4=ClosestPointOnLineSegment(cpos,b_vertices[3],b_vertices[0]);
-                float d1 = length(cpos-cp1);
-                float d2 = length(cpos-cp2);
-                float d3 = length(cpos-cp3);
-                float d4 = length(cpos-cp4);
-                float m1 = glm::min(d1,d2);
-                float m2 = glm::min(d3,d4);
-                float m = glm::min(m1,m2);
-                if(m>cRadius)return;
-                if(m==d1){
-                    cpoint=cp1;
-                    if (PointOnLine(cpoint,b_vertices[0],b_vertices[1])){
-                        vec2 t = normalize(b_vertices[1]-b_vertices[0]);
-                        normal = vec2(-t.y,t.x);
-                    }
-                    else{
-                        normal=normalize(cp1-cpos);
+                std::vector<std::pair<vec2,vec2>> b_edges = bx->getEdges();
+                for(auto& edge:b_edges){
+                    vec2 closet=ClosestPointOnLineSegment(c->getPosition(),edge.first,edge.second);
+                    if (length(closet-c->getPosition())<=c->getRadius()){
+                        return CollideInfo(c,bx,normalize(closet-c->getPosition()),length(closet-c->getPosition())-c->getRadius(),closet);
                     }
                 }
-                else if(m==d2){
-                    cpoint=cp2;
-                    if (PointOnLine(cpoint,b_vertices[1],b_vertices[2])){
-                        vec2 t = normalize(b_vertices[2]-b_vertices[1]);
-                        normal = vec2(-t.y,t.x);
-                    }
-                    else{
-                        normal=normalize(cp2-cpos);
-                    }
-                }
-                else if(m==d3){
-                    cpoint=cp3;
-                    if (PointOnLine(cpoint,b_vertices[2],b_vertices[3])){
-                        vec2 t = normalize(b_vertices[3]-b_vertices[2]);
-                        normal = vec2(-t.y,t.x);
-                    }
-                    else{
-                        normal=normalize(cp3-cpos);
-                    }
-                }
-                else{
-                    cpoint=cp4;
-                    if (PointOnLine(cpoint,b_vertices[3],b_vertices[0])){
-                        vec2 t = normalize(b_vertices[0]-b_vertices[3]);
-                        normal = vec2(-t.y,t.x);
-                    }
-                    else{
-                        normal=normalize(cp4-cpos);
-                    }
-                }
-                float depth = m-cRadius;
-                auto newVel = collideDynamicWithDynamic(depth,normal,cpoint,cpos,bx->getPosition(),c->getVelocity(),bx->getVelocity(),c->getMass(),
-                bx->getMass(),c->getAngleVelocity(),bx->getAngleVelocity(),c->getRotationInertia(),bx->getRotationInertia(),0.5f,1.0f);
-                c->setPosition(newVel[6], newVel[7]);
-                bx->setPosition(newVel[8], newVel[9]);
-                c->setVelocity(newVel[0], newVel[1]);
-                bx->setVelocity(newVel[2], newVel[3]);
-                c->setAngleVelocity(newVel[4]);
-                bx->setAngleVelocity(newVel[5]);
+                return CollideInfo(nullptr,nullptr,vec2(0,0),0,vec2(0,0));
+                
             }
             if ((a->getType() == BodyType::LINE && b->getType() == BodyType::BOX)||(b->getType() == BodyType::LINE && a->getType() == BodyType::BOX)){
-                return;
+                return CollideInfo(nullptr,nullptr,vec2(0,0),0,vec2(0,0));
                 Box* bx;
                 Line* l;
                 if (a->type == BodyType::BOX) {
@@ -419,36 +342,57 @@ namespace phy2d{
                     bx = dynamic_cast<Box*>(b);
                     l = dynamic_cast<Line*>(a);
                 }
-                auto b_vertices= bx->getVertices();
-                std::vector<std::pair<vec2,vec2>> edges;
-                vec2 l_n=normalize(l->getPoint1()-l->getPoint2());
-                vec2 l_t=vec2(-l_n.y, l_n.x);
-                std::vector<vec2> l_p={l->getPoint1(), l->getPoint2()};
-                auto bx_proj=getPolygonProjection(b_vertices,vec2(0,0),l_t);
-                auto l_proj=getPolygonProjection(l_p,vec2(0,0),l_t);
-                if (bx_proj.first > l_proj.second || bx_proj.second < l_proj.first) return;
-                else if (bx_proj.first == l_proj.first|| bx_proj.second == l_proj.second){
-                    vec2 normal=l_t;
-                    vec2 cpoint;
-                    std::vector<vec2> cpoints;
-                    float k1=l_n.y/l_n.x;
-                    for(auto& v: b_vertices){
-                        vec2 ab=l->getPoint1()-v;
-                        float k2=ab.y/ab.x;
-                        if (k1-k2<0.001) cpoints.push_back(v);
+                auto edges= bx->getEdges();
+                for (auto edge : edges){
+                    vec2 edge_normal= normalize(edge.second-edge.first);
+                    vec2 edge_tangent= normalize(vec2(-edge_normal.y,edge_normal.x));
+                    auto bx_proj= getPolygonProjection(bx->getVertices(),edge_normal);
+                    if(bx_proj.first > length(l->getPoint2()-l->getPoint1())||bx_proj.second < 0){
+                        return CollideInfo(nullptr,nullptr,vec2(0,0),0,vec2(0,0));
                     }
-                    if (cpoints.size()==0) return;
-                    else if (cpoints.size()==1) cpoint=cpoints[0];
-                    else cpoint = (cpoints[0]+cpoints[1])*0.5f;
-                    auto closet = ClosestPointOnLineSegment(cpoint,l->getPoint1(),l->getPoint2());
-                    auto newVel = collideDynamicWithStatic(-length(cpoint-closet),normal,cpoint,bx->getPosition(),l->getPosition(),bx->getVelocity(),bx->getMass(),
-                    l->getMass(),bx->getAngleVelocity(),l->getAngleVelocity(),bx->getRotationInertia(),l->getRotationInertia(),0.2f,0.8f);
-                    bx->setPosition(newVel[3],newVel[4]);
-                    bx->setAngleVelocity(newVel[2]);
-                    bx->setVelocity(newVel[0],newVel[1]);
+                    else if(bx_proj.first < 0||bx_proj.second > length(l->getPoint2()-l->getPoint1())){
+                        if(PointOnLine(l->getPoint1(),edge.first,edge.second)){
+                            vec2 normal= normalize(edge.second-bx->getPosition()+edge.first-bx->getPosition());
+                            float depth = -length(l->getPoint1()-ClosestPointOnLineSegment(l->getPoint1(),edge.first,edge.second));
+                            return CollideInfo(bx,l,normal,depth,l->getPoint1());
+                        }
+                        if(PointOnLine(l->getPoint2(),edge.first,edge.second)){
+                            vec2 normal= normalize(edge.second-bx->getPosition()+edge.first-bx->getPosition());
+                            float depth = -length(l->getPoint2()-ClosestPointOnLineSegment(l->getPoint2(),edge.first,edge.second));
+                            return CollideInfo(bx,l,normal,depth,l->getPoint2());
+                        }
+                    }
+                    else{
+                        if(PointOnLine(edge.first,l->getPoint1(),l->getPoint2())&&PointOnLine(edge.second,l->getPoint1(),l->getPoint2())){
+                            vec2 normal= normalize(l->getPoint2()-l->getPoint1());
+                            float depth1 = -length(edge.first-ClosestPointOnLineSegment(edge.first,l->getPoint1(),l->getPoint2()));
+                            float depth2 = -length(edge.second-ClosestPointOnLineSegment(edge.second,l->getPoint1(),l->getPoint2()));
+                            return CollideInfo(bx,l,normal,(depth1+depth2)/2,edge.first*0.5f+edge.second*0.5f);
+                        }
+                        else{
+                            if(PointOnLine(edge.first,l->getPoint1(),l->getPoint2())){
+                                vec2 normal= normalize(l->getPoint2()-l->getPoint1());
+                                float depth = -length(edge.first-ClosestPointOnLineSegment(edge.first,l->getPoint1(),l->getPoint2()));
+                                return CollideInfo(bx,l,normal,depth,edge.first);
+                            }
+                            else{
+                                if(PointOnLine(edge.second,l->getPoint1(),l->getPoint2())){
+                                    vec2 normal= normalize(l->getPoint2()-l->getPoint1());
+                                    float depth = -length(edge.second-ClosestPointOnLineSegment(edge.second,l->getPoint1(),l->getPoint2()));
+                                    return CollideInfo(bx,l,normal,depth,edge.second);
+                                }
+                            }
+                        }
+
+                    }
+
+                    
                 }
             }
-        
+            return CollideInfo(nullptr,nullptr,vec2(0,0),0,vec2(0,0));
         }
     };
+
+
+
 }

@@ -20,15 +20,36 @@ std::vector<Object *>& World::get_objects()
     return this->objects;
 }
 void World::update(float dt){
-    for(auto object:objects){
-        //vec2 newv=object->getVelocity()+vec2(0.0f,9.8f);
-        //object->setVelocity(newv.x,newv.y);
+    
+    for (auto object:objects){
+        if(!object->isAwake()) continue;
+        object->velocity.y+=gravity;
         object->update(dt);
     }
+    std::vector<CollideInfo> collideInfos;
     for(int i=0;i<objects.size();i++){
         for(int j=i+1;j<objects.size();j++){
-            Collision::collide(objects[i],objects[j]);
+            auto info = Collision::collide(objects[i],objects[j]);
+            if (info.obj1==nullptr||info.obj2==nullptr) continue;
+            collideInfos.push_back(info);
         }
+    }
+    for(auto collideInfo:collideInfos){
+        auto obj1=collideInfo.obj1;
+        auto obj2=collideInfo.obj2;
+        if(!obj1->isAwake()||!obj2->isAwake()){
+            obj1->setAwake(true);
+            obj2->setAwake(true);
+        }
+    }
+    for(auto collideInfo:collideInfos){
+        auto obj1=collideInfo.obj1;
+        auto obj2=collideInfo.obj2;
+        if(!obj1->isAwake()&&!obj2->isAwake()) continue;
+        collideInfo.generate();
+    }
+    for (auto object:objects){
+        object->updateSleepTime(dt);
     }
 }
 void World::render()

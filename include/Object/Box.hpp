@@ -13,7 +13,7 @@ public:
     void update(float dt) override;
     vec2 getSize() const;
     std::vector<vec2> getVertices();
-    std::vector<vec2> getEdges();
+    std::vector<std::pair<vec2, vec2>> getEdges();
 };
 }
 

@@ -12,23 +12,20 @@ Circle::Circle(float x,float y,float m,float r){
     this->type = CIRCLE;
     this->torque = 0;
     this->angle_velocity = 0;
-    this->tmp_v = vec2(0,0);
-    this->tmp_av = 0;
+    this->is_static=false;
 }
 
 void Circle::update(float dt){
     angle_velocity += torque/RotationInertia;
-    angle_velocity += tmp_av;
     velocity += force/mass;
-    velocity +=tmp_v;
     velocity =clamp(velocity,-radius/dt,radius/dt);
     position += velocity * dt;
     angle += angle_velocity * dt;
     force = vec2(0,0);
     torque = 0;
-    tmp_v = vec2(0,0);
-    tmp_av = 0;
+
 }
+
 
 float Circle::getRadius() const{
     return radius;

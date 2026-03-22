@@ -20,30 +20,30 @@ int main() {
     cv::imshow("Physics2D", window);
     srand((unsigned)time(NULL));
 
-    Circle* c1=new Circle(410,100,1,30);
-    Circle* c2=new Circle(400,400,1,30);
+    Circle* c1=new Circle(420,100,4,30);
+    Circle* c2=new Circle(400,400,4,30);
     c1->setVelocity(0.0f, 200.0f);
 
     World world;
     world.add_object(c1);
     world.add_object(c2);
-    //Box* box = new Box(500, 700,100,50,1);
+    Box* box = new Box(500, 700,100,50,1);
     Line* line1 = new Line(100,100, 900, 100,1);
     Line* line2 = new Line(900, 100, 900, 900, 1);
     Line* line3 = new Line(900, 900, 100, 900, 1);
     Line* line4 = new Line(100, 900, 100, 100, 1);
-    //box->setAngleVelocity(PI/4);
-    //world.add_object(box);
+    box->setAngleVelocity(PI/4);
+    world.add_object(box);
     world.add_object(line1);
     world.add_object(line2);
     world.add_object(line3);
     world.add_object(line4);
     
-    /*for(int i = 0; i < 60; i++){
-        Circle* c = new Circle(100+rand()%800, 100+rand()%800, 1, 10);
+    for(int i = 0; i < 60; i++){
+        Circle* c = new Circle(100+rand()%800, 100+rand()%800, 1, 20);
         c->setVelocity(1.0f, 200.0f);
         world.add_object(c);
-    }*/
+    }
     
 
     while (true)
@@ -54,7 +54,7 @@ int main() {
         for(auto obj: world.get_objects()){
             if(obj->getType() == BodyType::CIRCLE){
                 Circle* c= dynamic_cast<Circle*>(obj);
-                cv::circle(window, cv::Point(c->getPosition().x, c->getPosition().y), c->getRadius(), cv::Scalar(255, 255, 0));
+                cv::circle(window, cv::Point(c->getPosition().x, c->getPosition().y), c->getRadius(), c->isAwake()?cv::Scalar(255, 255, 0):cv::Scalar(0, 0, 255));
                 cv::line(window, cv::Point(c->getPosition().x, c->getPosition().y), cv::Point(c->getPosition().x + cos(c->getAngle())*c->getRadius(), c->getPosition().y + sin(c->getAngle())*c->getRadius()), cv::Scalar(255, 255, 0));        
             }
             else if(obj->getType() == BodyType::LINE){

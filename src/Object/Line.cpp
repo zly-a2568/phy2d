@@ -11,6 +11,7 @@ namespace phy2d{
         this->position.x=(x1+x2)/2;
         this->position.y=(y1+y2)/2;
         this->RotationInertia=mass*length(p1-p2)*length(p1-p2)/12;
+        this->is_static=true;
     }
     void Line::update(float dt){
         this->position.x=(p1.x+p2.x)/2;

@@ -1,4 +1,5 @@
 #include "../../include/Object/Box.hpp"
+
 namespace phy2d{
 Box::Box(float x ,float y, float width, float height, float mass){
     this->position = vec2(x, y);
@@ -11,6 +12,7 @@ Box::Box(float x ,float y, float width, float height, float mass){
     this->mass = mass;
     this->RotationInertia = (1.0f / 12.0f) * mass * (size.x * size.x + size.y * size.y);
     this->type = BOX;
+    this->is_static=false;
 }
 
 void Box::update(float dt){
@@ -44,13 +46,18 @@ std::vector<vec2> Box::getVertices(){
     return vertices;
 
 }
-std::vector<vec2> Box::getEdges(){
-    std::vector<vec2> edges;
+
+std::vector<std::pair<vec2, vec2>> phy2d::Box::getEdges()
+{
+    std::vector<std::pair<vec2, vec2>> edges;
     std::vector<vec2> vertices = getVertices();
-    edges.push_back(vertices[0]-vertices[1]);
-    edges.push_back(vertices[1]-vertices[2]);
-    edges.push_back(vertices[2]-vertices[3]);
-    edges.push_back(vertices[3]-vertices[0]);
+    edges.push_back(std::make_pair(vertices[0], vertices[1]));
+    edges.push_back(std::make_pair(vertices[1], vertices[2]));
+    edges.push_back(std::make_pair(vertices[2], vertices[3]));
+    edges.push_back(std::make_pair(vertices[3], vertices[0]));
     return edges;
 }
+
 }
+
+

@@ -1,4 +1,5 @@
 #include "../../include/Object/Object.hpp"
+
 namespace phy2d {
 vec2 Object::getPosition() const {
     return position;
@@ -43,7 +44,13 @@ void Object::applyForce(vec2 f)
     force+=f;
 }
 
-float Object::getRotationInertia() const{
+void Object::applyImpulse(vec2 p,vec2 n)
+{
+    
+}
+
+float Object::getRotationInertia() const
+{
     return RotationInertia;
 }
 
@@ -57,15 +64,42 @@ vec2 Object::getVelocity() const
     return velocity;
 }
 
-void Object::addVelocity(float vx, float vy){
-    tmp_v+= vec2(vx,vy);
+bool Object::isStatic() const
+{
+    return is_static;
 }
 
-void Object::addAngleVelocity(float av){
-    tmp_av+=av;
+bool Object::isAwake() const
+{
+    return awake;
 }
-
-void Object::setVelocity(float vx, float vy) {
+void Object::setAwake(bool a)
+{
+    if (a) {
+        awake = true;
+        sleep_time = 0.0f;
+    } else {
+        awake = false;
+        velocity.x=0.0f;
+        velocity.y=0.0f;
+        angle_velocity=0.0f;
+    }
+}
+void Object::updateSleepTime(float dt)
+{
+    float energy = 0.5f * mass * velocity.length() * velocity.length() + 0.5f * RotationInertia * angle_velocity * angle_velocity;
+    if(energy < 0.01f){
+        sleep_time+=dt;
+        if(sleep_time > 1.0f){
+            setAwake(false);
+        }
+    }
+    else{
+        sleep_time = 0.0f;
+    }
+}
+void Object::setVelocity(float vx, float vy)
+{
     velocity.x=vx;
     velocity.y=vy;
 }
