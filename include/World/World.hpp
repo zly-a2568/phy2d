@@ -6,6 +6,7 @@
 
 #include <algorithm>
 
+
 namespace phy2d{
     class World {
     public:
@@ -16,6 +17,7 @@ namespace phy2d{
         void remove_object(Object* obj);
         std::vector<Object*>& get_objects();
         void update(float dt);
+        virtual AABB getAABB(){};
         void render();
 
     private:

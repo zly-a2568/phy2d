@@ -22,7 +22,12 @@ void Box::update(float dt){
     angle+=angle_velocity*dt;
     force = vec2(0,0);
     torque = 0;
-
+    auto vertices=getVertices();
+    float l=glm::min(glm::min(vertices[0].x,vertices[1].x),glm::min(vertices[2].x,vertices[3].x));
+    float r=glm::max(glm::max(vertices[0].x,vertices[1].x),glm::max(vertices[2].x,vertices[3].x));
+    float b=glm::min(glm::min(vertices[0].y,vertices[1].y),glm::min(vertices[2].y,vertices[3].y));
+    float t=glm::max(glm::max(vertices[0].y,vertices[1].y),glm::max(vertices[2].y,vertices[3].y));
+    bounding_box=AABB(l,r,b,t);
 }
 
 vec2 Box::getSize()const{
@@ -57,6 +62,7 @@ std::vector<std::pair<vec2, vec2>> phy2d::Box::getEdges()
     edges.push_back(std::make_pair(vertices[3], vertices[0]));
     return edges;
 }
+
 
 }
 

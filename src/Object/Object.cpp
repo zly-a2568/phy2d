@@ -85,19 +85,21 @@ void Object::setAwake(bool a)
         angle_velocity=0.0f;
     }
 }
-void Object::updateSleepTime(float dt)
-{
-    float energy = 0.5f * mass * velocity.length() * velocity.length() + 0.5f * RotationInertia * angle_velocity * angle_velocity;
-    if(energy < 0.01f){
+
+void Object::updateSleepTime(float dt) {
+    float energy=0.5f*length(velocity)*length(velocity)*mass+0.5f*angle_velocity*angle_velocity*RotationInertia;
+    if (energy<100.0f) {
         sleep_time+=dt;
-        if(sleep_time > 1.0f){
+        if (sleep_time>=0.1f) {
             setAwake(false);
         }
     }
-    else{
-        sleep_time = 0.0f;
+    else {
+        sleep_time=0.0f;
+        if (!awake)setAwake(true);
     }
 }
+
 void Object::setVelocity(float vx, float vy)
 {
     velocity.x=vx;

@@ -16,6 +16,11 @@ namespace phy2d{
     void Line::update(float dt){
         this->position.x=(p1.x+p2.x)/2;
         this->position.y=(p1.y+p2.y)/2;
+        float l=glm::min(p1.x,p2.x)-10.0f;
+        float r=glm::max(p1.x,p2.x)+10.0f;
+        float b=glm::min(p1.y,p2.y)-10.0f;
+        float t=glm::max(p1.y,p2.y)+10.0f;
+        bounding_box=AABB(l,r,b,t);
     }
     vec2 Line::getPoint1() const{
         return this->p1;

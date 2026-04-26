@@ -3,7 +3,8 @@
 
 #include <utility>
 #include <glm/glm.hpp>
-#include "../Utility/Rect/Rect.hpp"
+
+#include "../Utility/Rect/AABB.hpp"
 
 using namespace glm;
 
@@ -18,8 +19,8 @@ enum BodyType {
 
 class Object {
 public:
-	Object() = default;
-	virtual ~Object() = default;
+	Object(){};
+	virtual ~Object(){};
 
 	// 位置
 	virtual vec2 getPosition() const;
@@ -43,6 +44,7 @@ public:
 	virtual void applyTorque(float t);
 	virtual void applyForce(vec2 f);
 	virtual void applyImpulse(vec2 p,vec2 n);
+	virtual void updateSleepTime(float dt);
 
 
 	virtual float getRotationInertia() const;
@@ -52,7 +54,6 @@ public:
 	virtual bool isStatic() const;
 	virtual bool isAwake() const;
 	virtual void setAwake(bool a);
-	virtual void updateSleepTime(float dt);
 
 	BodyType getType();
 
@@ -65,10 +66,11 @@ public:
 	float torque;
 	float RotationInertia;
 	float angle;
-	Rect bounding_box;
+	AABB bounding_box;
 	bool is_static;
 	bool awake=true;
 	float sleep_time;
+	int tree_id=-1;
 };
 
 } // namespace phy2d

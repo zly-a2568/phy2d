@@ -23,6 +23,7 @@ void Circle::update(float dt){
     angle += angle_velocity * dt;
     force = vec2(0,0);
     torque = 0;
+    bounding_box = AABB(position.x-radius,position.x+radius,position.y-radius,position.y+radius);
 
 }
 

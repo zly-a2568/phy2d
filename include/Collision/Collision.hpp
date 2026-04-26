@@ -17,6 +17,17 @@ namespace phy2d{
         static float cross2d(vec2 a, vec2 b){
             return a.x * b.y - a.y * b.x;
         }
+        static float cross2d(vec2 a,vec2 b,vec2 c) {
+            return (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x);
+        }
+        static bool on_segment(vec2 A, vec2 B, vec2 P) {
+            // 检查 P 的 x 坐标是否在 A 和 B 之间，且 y 坐标是否在 A 和 B 之间
+            return P.x >= glm::min(A.x, B.x) && P.x <= glm::max(A.x, B.x) &&
+                   P.y >= glm::min(A.y, B.y) && P.y <= glm::max(A.y, B.y);
+        }
+        static vec2 get_perp(vec2 a) {
+            return vec2(a.y,-a.x);
+        }
 
         static bool Line1OnLine2(vec2 a1, vec2 a2, vec2 b1, vec2 b2){
             vec2 ab1=a1 - b1;
@@ -27,6 +38,43 @@ namespace phy2d{
             float an2=dot(ab2,b)/lb;
             if (glm::max(an1,an2) <= 0.0f || glm::min(an1,an2) >= lb)return false;
             return true;
+        }
+        static bool LineContactLine(vec2 as,vec2 ae,vec2 bs ,vec2 be) {
+            if (glm::max(as.x,ae.x)<glm::min(bs.x,be.x) ||
+                glm::max(bs.x,be.x)<glm::min(as.x,ae.x) ||
+                glm::max(as.y,ae.y)<glm::min(bs.y,be.y)||
+                glm::max(bs.y,be.y)<glm::min(as.y,ae.y)
+                ) {
+                return false;
+            }
+            float c1=cross2d(bs,be,as);
+            float c2=cross2d(bs,be,ae);
+            float c3=cross2d(as,ae,bs);
+            float c4=cross2d(as,ae,be);
+            if ((c1*c2<0)&&(c3*c4<0)) return true;
+
+            if (c1==0 && on_segment(bs,be,as)) return true;
+            if (c2==0 && on_segment(bs,be,ae)) return true;
+            if (c3==0 && on_segment(as,ae,bs)) return true;
+            if (c4==0 && on_segment(as,ae,be)) return true;
+
+            return false;
+
+
+        }
+        static vec2 get_intersection(vec2 A,vec2 B,vec2 C,vec2 D) {
+            vec2 P;
+            float area_abc=cross2d(A,B,C);
+            float area_abd=cross2d(A,B,D);
+            float denom=area_abc-area_abd;
+            if (fabs(denom)<1e-5) {
+                P.x=NULL;
+                P.y=NULL;
+                return P;
+            }
+            float t=area_abc/denom;
+            P=C+t*(D-C);
+            return P;
         }
 
         static std::pair<float,float> getPolygonProjection(std::vector<vec2> vertices, vec2 p){
@@ -343,51 +391,19 @@ namespace phy2d{
                     l = dynamic_cast<Line*>(a);
                 }
                 auto edges= bx->getEdges();
-                for (auto edge : edges){
-                    vec2 edge_normal= normalize(edge.second-edge.first);
-                    vec2 edge_tangent= normalize(vec2(-edge_normal.y,edge_normal.x));
-                    auto bx_proj= getPolygonProjection(bx->getVertices(),edge_normal);
-                    if(bx_proj.first > length(l->getPoint2()-l->getPoint1())||bx_proj.second < 0){
-                        return CollideInfo(nullptr,nullptr,vec2(0,0),0,vec2(0,0));
-                    }
-                    else if(bx_proj.first < 0||bx_proj.second > length(l->getPoint2()-l->getPoint1())){
-                        if(PointOnLine(l->getPoint1(),edge.first,edge.second)){
-                            vec2 normal= normalize(edge.second-bx->getPosition()+edge.first-bx->getPosition());
-                            float depth = -length(l->getPoint1()-ClosestPointOnLineSegment(l->getPoint1(),edge.first,edge.second));
-                            return CollideInfo(bx,l,normal,depth,l->getPoint1());
-                        }
-                        if(PointOnLine(l->getPoint2(),edge.first,edge.second)){
-                            vec2 normal= normalize(edge.second-bx->getPosition()+edge.first-bx->getPosition());
-                            float depth = -length(l->getPoint2()-ClosestPointOnLineSegment(l->getPoint2(),edge.first,edge.second));
-                            return CollideInfo(bx,l,normal,depth,l->getPoint2());
-                        }
-                    }
-                    else{
-                        if(PointOnLine(edge.first,l->getPoint1(),l->getPoint2())&&PointOnLine(edge.second,l->getPoint1(),l->getPoint2())){
-                            vec2 normal= normalize(l->getPoint2()-l->getPoint1());
-                            float depth1 = -length(edge.first-ClosestPointOnLineSegment(edge.first,l->getPoint1(),l->getPoint2()));
-                            float depth2 = -length(edge.second-ClosestPointOnLineSegment(edge.second,l->getPoint1(),l->getPoint2()));
-                            return CollideInfo(bx,l,normal,(depth1+depth2)/2,edge.first*0.5f+edge.second*0.5f);
-                        }
-                        else{
-                            if(PointOnLine(edge.first,l->getPoint1(),l->getPoint2())){
-                                vec2 normal= normalize(l->getPoint2()-l->getPoint1());
-                                float depth = -length(edge.first-ClosestPointOnLineSegment(edge.first,l->getPoint1(),l->getPoint2()));
-                                return CollideInfo(bx,l,normal,depth,edge.first);
-                            }
-                            else{
-                                if(PointOnLine(edge.second,l->getPoint1(),l->getPoint2())){
-                                    vec2 normal= normalize(l->getPoint2()-l->getPoint1());
-                                    float depth = -length(edge.second-ClosestPointOnLineSegment(edge.second,l->getPoint1(),l->getPoint2()));
-                                    return CollideInfo(bx,l,normal,depth,edge.second);
-                                }
-                            }
-                        }
+                vec2 lp1=l->getPoint1();
+                vec2 lp2=l->getPoint2();
+                for (auto& edge:edges) {
+                    if (LineContactLine(edge.first,edge.second,lp1,lp2)) {
+                        vec2 cpoint=get_intersection(edge.first,edge.second,lp1,lp2);
+                        vec2 t=normalize(get_perp(lp2-lp1));
 
+                        return CollideInfo(bx,l,t,0,cpoint);
                     }
+                }
 
                     
-                }
+
             }
             return CollideInfo(nullptr,nullptr,vec2(0,0),0,vec2(0,0));
         }

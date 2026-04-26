@@ -5,6 +5,7 @@
 using namespace glm;
 
 namespace phy2d{
+
     class CollideInfo {
 public:
     float cross2d(vec2 a, vec2 b) {
@@ -23,8 +24,34 @@ public:
         this->normal = normal;
         this->depth = depth;
         this->contact = contact;
-        this->restitution = 0.5f;
-        this->friction = 0.5f;
+        this->restitution = 1.0f;
+        this->friction = 1.0f;
+    }
+    void generate_position_dynamic() {
+        vec2 fixed_p1= obj1->position+normal*depth*0.5f;
+        vec2 fixed_p2= obj2->position-normal*depth*0.5f;
+        obj1->position = fixed_p1;
+        obj2->position = fixed_p2;
+    }
+    void generate_position_static() {
+        if (obj1->is_static&&obj2->is_static){
+            return;
+        }
+        if(obj1->is_static){
+            std::swap(obj1, obj2);
+        }
+
+        vec2 fixed_p1= obj1->position + normal*depth;
+        obj1->position = fixed_p1;
+    }
+    void generate_position(){
+        if(!obj1||!obj2) return;
+        if(obj1->is_static&&obj2->is_static)return;
+        if(obj1->is_static||obj2->is_static){
+            generate_position_static();
+        }else{
+            generate_position_dynamic();
+        }
     }
     void generate(){
         if(!obj1||!obj2) return;
@@ -91,25 +118,12 @@ public:
             obj2->velocity+= vec2(newbVel);
             obj1->angle_velocity+= newaAngleVel.z;
             obj2->angle_velocity+= newbAngleVel.z;
-            vec2 fixed_p1= obj1->position+normal*depth*0.5f;
-            vec2 fixed_p2= obj2->position-normal*depth*0.5f;
-            obj1->position = fixed_p1;
-            obj2->position = fixed_p2;
 
             
     }
     void generate_static(){
             if(!obj1||!obj2) return;
             vec2 t=vec2(normal.y, -normal.x);
-            if (obj1->is_static&&obj2->is_static){
-                return;
-            }
-            if(obj1->is_static){
-                std::swap(obj1, obj2);
-            }
-
-            vec2 fixed_p1= obj1->position + normal*depth;
-            obj1->position = fixed_p1;
             vec3 r1 = vec3(contact.x,contact.y,0.0f) - vec3(obj1->position.x, obj1->position.y, 0.0f);
             
             vec3 vc1= vec3(obj1->getVelocity().x, obj1->getVelocity().y, 0.0f) + cross(vec3(0,0,obj1->getAngleVelocity()), r1);
